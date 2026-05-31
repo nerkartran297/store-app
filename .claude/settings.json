@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter create *)",
+      "Bash(flutter pub *)",
+      "Bash(flutter test *)",
+      "Bash(flutter analyze *)",
+      "Bash(awk '/^  flutter_riverpod:/{f=1} f&&/version:/{print \"flutter_riverpod \" $2; f=0} /^  riverpod:/{r=1} r&&/version:/{print \"riverpod \" $2; r=0}' pubspec.lock)",
+      "Bash(cd d:/store-app; find ~/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_riverpod-3.3.1 -name \"*.dart\" 2>/dev/null | head; echo \"===\"; grep -rl \"NotifierProvider\" ~/AppData/Local/Pub/Cache/hosted/pub.dev/riverpod-3.2.1/lib/ 2>/dev/null | head -3)",
+      "Read(//c/Users/201ng/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_riverpod-3.3.1/**)",
+      "Read(//c/Users/201ng/AppData/Local/Pub/Cache/hosted/pub.dev/riverpod-3.2.1/lib/**)",
+      "Bash(flutter build *)",
+      "Bash(psql --version)",
+      "Bash(where.exe psql *)",
+      "Bash(dart pub *)",
+      "Bash(adb devices *)",
+      "Bash(flutter devices *)",
+      "Bash(timeout 240 flutter run -d emulator-5554 --dart-define=SUPABASE_URL=https://xuyteabfzaaqorvgolxi.supabase.co --dart-define=SUPABASE_ANON_KEY=sb_publishable_lbPAmfoooyNW-giPRrF8mA_t_MsrvrB)"
+    ]
+  }
+}
