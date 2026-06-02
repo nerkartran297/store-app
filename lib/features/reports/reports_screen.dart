@@ -108,6 +108,27 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
+                    Text('Doanh thu theo ngày',
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    if (r.daily.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: Text('Chưa có doanh thu')),
+                      ),
+                    for (final DailyRevenue d in r.daily)
+                      Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.calendar_today),
+                          title: Text(DateFormat('EEEE, dd/MM/yyyy', 'vi_VN')
+                              .format(d.day)),
+                          subtitle: Text('${d.orderCount} đơn'),
+                          trailing: Text(Money.format(d.revenue),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 15)),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
                     Text('Top món bán chạy',
                         style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),

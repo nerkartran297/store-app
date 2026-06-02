@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../domain/models/customer.dart';
+import '../customers/customers_screen.dart';
 
 /// Kết quả chọn khách cho hóa đơn.
 class CustomerSelection {
@@ -102,6 +103,15 @@ class _CustomerSearchSheet extends ConsumerStatefulWidget {
 class _CustomerSearchSheetState extends ConsumerState<_CustomerSearchSheet> {
   String _query = '';
 
+  /// Mở form tạo khách mới; nếu tạo xong thì đóng sheet và trả khách đó về
+  /// cho luồng chọn khách (pickCustomer) xử lý ưu đãi như bình thường.
+  Future<void> _createNew() async {
+    final created = await openCustomerForm(context, ref);
+    if (created != null && mounted) {
+      Navigator.pop(context, created);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final result = ref.watch(_searchProvider(_query));
@@ -114,7 +124,7 @@ class _CustomerSearchSheetState extends ConsumerState<_CustomerSearchSheet> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: TextField(
                 autofocus: true,
                 decoration: const InputDecoration(
@@ -122,6 +132,17 @@ class _CustomerSearchSheetState extends ConsumerState<_CustomerSearchSheet> {
                   prefixIcon: Icon(Icons.search),
                 ),
                 onChanged: (v) => setState(() => _query = v),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.person_add),
+                  label: const Text('Tạo khách hàng mới'),
+                  onPressed: _createNew,
+                ),
               ),
             ),
             Expanded(

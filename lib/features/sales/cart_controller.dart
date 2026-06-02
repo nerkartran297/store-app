@@ -91,27 +91,37 @@ class CartController extends Notifier<CartState> {
   @override
   CartState build() => const CartState();
 
-  void addProduct(Product p) {
+  /// Thêm 1 sản phẩm vào giỏ. Trả về false nếu đã chạm trần tồn kho.
+  bool addProduct(Product p) {
     final idx = state.lines.indexWhere((l) => l.product.id == p.id);
+    final currentQty = idx >= 0 ? state.lines[idx].qty : 0;
+    if (currentQty + 1 > p.stockQty) return false; // vượt tồn kho
+
     final lines = [...state.lines];
     if (idx >= 0) {
-      lines[idx] = lines[idx].copyWith(qty: lines[idx].qty + 1);
+      lines[idx] = lines[idx].copyWith(qty: currentQty + 1);
     } else {
       lines.add(CartLine(product: p, qty: 1));
     }
     state = state.copyWith(lines: lines);
+    return true;
   }
 
-  void setQty(String productId, int qty) {
+  /// Đặt số lượng. Tự kẹp theo tồn kho. Trả về false nếu bị kẹp xuống.
+  bool setQty(String productId, int qty) {
     final lines = [...state.lines];
     final idx = lines.indexWhere((l) => l.product.id == productId);
-    if (idx < 0) return;
+    if (idx < 0) return true;
     if (qty <= 0) {
       lines.removeAt(idx);
-    } else {
-      lines[idx] = lines[idx].copyWith(qty: qty);
+      state = state.copyWith(lines: lines);
+      return true;
     }
+    final stock = lines[idx].product.stockQty;
+    final clamped = qty > stock ? stock : qty;
+    lines[idx] = lines[idx].copyWith(qty: clamped);
     state = state.copyWith(lines: lines);
+    return clamped == qty;
   }
 
   void setCustomer(

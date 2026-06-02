@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/utils/money.dart';
 import '../../data/providers.dart';
 import '../../domain/models/customer.dart';
 import '../../domain/models/customer_group.dart';
@@ -79,13 +80,13 @@ class CustomersScreen extends ConsumerWidget {
       openCustomerForm(context, ref, customer: customer);
 }
 
-/// Mở form thêm/sửa khách (bottom sheet). Trả về true nếu đã lưu.
-Future<bool?> openCustomerForm(
+/// Mở form thêm/sửa khách (bottom sheet). Trả về Customer đã lưu, null nếu hủy.
+Future<Customer?> openCustomerForm(
   BuildContext context,
   WidgetRef ref, {
   Customer? customer,
 }) {
-  return showModalBottomSheet<bool>(
+  return showModalBottomSheet<Customer>(
     context: context,
     isScrollControlled: true,
     builder: (_) => _CustomerForm(customer: customer, ref: ref),
@@ -155,12 +156,24 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
           .showSnackBar(const SnackBar(content: Text('Nhập tên khách')));
       return;
     }
-    final balance = int.tryParse(_prepaidBalance.text) ?? 0;
-    if (_prepaid && balance <= 0) {
+    final isNew = widget.customer == null;
+    final inputBalance = int.tryParse(_prepaidBalance.text) ?? 0;
+    // Tạo mới + bật trả trước -> bắt buộc nhập số tiền ban đầu > 0.
+    if (isNew && _prepaid && inputBalance <= 0) {
       _prepaidFocus.requestFocus();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Nhập số tiền trả trước (> 0)')));
       return;
+    }
+    // Số dư cuối: tạo mới dùng số nhập; sửa thì GIỮ số dư cũ (đổi qua nút Nạp
+    // tiền). Tắt trả trước -> 0.
+    final int finalBalance;
+    if (!_prepaid) {
+      finalBalance = 0;
+    } else if (isNew) {
+      finalBalance = inputBalance;
+    } else {
+      finalBalance = widget.customer!.prepaidBalance;
     }
     setState(() => _saving = true);
     final repo = widget.ref.read(customerRepoProvider);
@@ -170,17 +183,18 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
       phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
       company: _company.text.trim().isEmpty ? null : _company.text.trim(),
       isPrepaidMember: _prepaid,
-      prepaidBalance: _prepaid ? balance : 0,
+      prepaidBalance: finalBalance,
       points: widget.customer?.points ?? 0,
     );
     try {
+      final Customer saved;
       if (widget.customer == null) {
-        await repo.create(c, groupIds: _selectedGroups.toList());
+        saved = await repo.create(c, groupIds: _selectedGroups.toList());
       } else {
-        await repo.update(c, groupIds: _selectedGroups.toList());
+        saved = await repo.update(c, groupIds: _selectedGroups.toList());
       }
       widget.ref.invalidate(customersListProvider);
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) Navigator.pop(context, saved);
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
@@ -273,14 +287,26 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
                 onChanged: (v) => setState(() => _prepaid = v),
               ),
             ),
-            if (_prepaid)
+            // Khi TẠO MỚI: nhập số tiền trả trước ban đầu.
+            // Khi SỬA: số dư chỉ đổi qua nút "Nạp tiền" (có ghi sổ) — không cho
+            // sửa tay ở đây để tránh ghi đè nhầm.
+            if (_prepaid && widget.customer == null)
               TextField(
                 controller: _prepaidBalance,
                 focusNode: _prepaidFocus,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'Số tiền trả trước (VND)',
-                  hintText: 'Nhập số tiền khách đã trả trước',
+                  labelText: 'Số tiền trả trước ban đầu (VND)',
+                  hintText: 'Nhập số tiền khách trả trước',
+                ),
+              ),
+            if (_prepaid && widget.customer != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Số dư hiện tại: ${Money.format(widget.customer!.prepaidBalance)} '
+                  '· dùng nút "Nạp tiền" ở màn chi tiết để nạp thêm.',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
             const SizedBox(height: 20),

@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Cần cho mọi bản build (kể cả release) để gọi Supabase qua mạng. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="pos_app"
+        android:label="POS Quán Cơm"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

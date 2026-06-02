@@ -40,29 +40,62 @@ class SalesScreen extends ConsumerWidget {
   }
 }
 
-class _ProductGrid extends ConsumerWidget {
+class _ProductGrid extends ConsumerStatefulWidget {
   const _ProductGrid();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ProductGrid> createState() => _ProductGridState();
+}
+
+class _ProductGridState extends ConsumerState<_ProductGrid> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
     final products = ref.watch(activeProductsProvider);
-    return products.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Lỗi: $e')),
-      data: (list) => GridView.builder(
-        padding: const EdgeInsets.all(12),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 180,
-          childAspectRatio: 0.95,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
+    final q = _query.trim().toLowerCase();
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+          child: TextField(
+            decoration: const InputDecoration(
+              hintText: 'Tìm món',
+              prefixIcon: Icon(Icons.search),
+              isDense: true,
+            ),
+            onChanged: (v) => setState(() => _query = v),
+          ),
         ),
-        itemCount: list.length,
-        itemBuilder: (_, i) {
-          final p = list[i];
-          return _ProductTile(product: p);
-        },
-      ),
+        Expanded(
+          child: products.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Lỗi: $e')),
+            data: (all) {
+              final list = q.isEmpty
+                  ? all
+                  : all
+                      .where((p) => p.name.toLowerCase().contains(q))
+                      .toList();
+              if (list.isEmpty) {
+                return const Center(child: Text('Không tìm thấy món'));
+              }
+              return GridView.builder(
+                padding: const EdgeInsets.all(12),
+                gridDelegate:
+                    const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 180,
+                  childAspectRatio: 0.95,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                itemCount: list.length,
+                itemBuilder: (_, i) => _ProductTile(product: list[i]),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -77,7 +110,18 @@ class _ProductTile extends ConsumerWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: out ? null : () => ref.read(cartProvider.notifier).addProduct(product),
+        onTap: out
+            ? null
+            : () {
+                final ok =
+                    ref.read(cartProvider.notifier).addProduct(product);
+                if (!ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Chỉ còn ${product.stockQty} phần "${product.name}"'),
+                    duration: const Duration(seconds: 1),
+                  ));
+                }
+              },
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: Column(
@@ -228,8 +272,18 @@ class _CartPanel extends ConsumerWidget {
                                 constraints: const BoxConstraints(),
                                 padding: const EdgeInsets.all(4),
                                 icon: const Icon(Icons.add_circle_outline),
-                                onPressed: () => ctrl.setQty(
-                                    l.product.id, l.qty + 1),
+                                onPressed: () {
+                                  final ok = ctrl.setQty(
+                                      l.product.id, l.qty + 1);
+                                  if (!ok) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(SnackBar(
+                                      content: Text(
+                                          'Chỉ còn ${l.product.stockQty} phần'),
+                                      duration: const Duration(seconds: 1),
+                                    ));
+                                  }
+                                },
                               ),
                             ],
                           ),

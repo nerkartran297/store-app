@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/utils/error_message.dart';
 import '../../core/utils/money.dart';
 import '../../data/providers.dart';
 import '../../domain/models/customer.dart';
+import '../../domain/models/invoice.dart';
 import '../../domain/models/meal_package.dart';
+import '../invoices/invoice_detail_screen.dart';
 import 'customers_screen.dart';
 
 final customerDetailProvider =
@@ -18,6 +21,12 @@ final customerPackagesProvider = FutureProvider.autoDispose
   return ref.watch(customerRepoProvider).fetchPackages(id);
 });
 
+/// Lịch sử hóa đơn của khách — để biết "khách ăn gì".
+final customerInvoicesProvider = FutureProvider.autoDispose
+    .family<List<Invoice>, String>((ref, id) async {
+  return ref.watch(invoiceRepoProvider).fetchByCustomer(id);
+});
+
 class CustomerDetailScreen extends ConsumerWidget {
   final String customerId;
   const CustomerDetailScreen({super.key, required this.customerId});
@@ -26,6 +35,7 @@ class CustomerDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final customer = ref.watch(customerDetailProvider(customerId));
     final packages = ref.watch(customerPackagesProvider(customerId));
+    final invoices = ref.watch(customerInvoicesProvider(customerId));
 
     return Scaffold(
       appBar: AppBar(
@@ -38,7 +48,7 @@ class CustomerDetailScreen extends ConsumerWidget {
               onPressed: () async {
                 final saved =
                     await openCustomerForm(context, ref, customer: c);
-                if (saved == true) {
+                if (saved != null) {
                   ref.invalidate(customerDetailProvider(customerId));
                   ref.invalidate(customerPackagesProvider(customerId));
                 }
@@ -74,6 +84,12 @@ class CustomerDetailScreen extends ConsumerWidget {
                         Text('Trả trước ${Money.format(c.prepaidBalance)}'),
                   ),
               ],
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.add_card),
+              label: const Text('Nạp tiền trả trước'),
+              onPressed: () => _topUp(context, ref, c),
             ),
             const Divider(height: 32),
             Row(
@@ -125,10 +141,115 @@ class CustomerDetailScreen extends ConsumerWidget {
                       ],
                     ),
             ),
+            const Divider(height: 32),
+            Text('Lịch sử mua hàng',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            invoices.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (e, _) => Text('Lỗi lịch sử: $e'),
+              data: (list) => list.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text('Chưa có hóa đơn nào'),
+                    )
+                  : Column(
+                      children: [
+                        for (final inv in list)
+                          Card(
+                            child: ListTile(
+                              leading: Icon(inv.isPackageInvoice
+                                  ? Icons.card_membership
+                                  : Icons.receipt),
+                              title: Text(
+                                inv.items
+                                    .map((it) =>
+                                        '${it.nameSnapshot}×${it.qty}')
+                                    .join(', '),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(DateFormat('dd/MM/yyyy HH:mm')
+                                  .format(inv.createdAt)),
+                              trailing: Text(
+                                inv.isPackageInvoice
+                                    ? 'Gói'
+                                    : Money.format(inv.total),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              onTap: () =>
+                                  Navigator.of(context).push(MaterialPageRoute(
+                                builder: (_) =>
+                                    InvoiceDetailScreen(invoiceId: inv.id),
+                              )),
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _topUp(BuildContext context, WidgetRef ref, Customer c) async {
+    final controller = TextEditingController();
+    final amount = await showDialog<int>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Nạp tiền trả trước'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Số dư hiện tại: ${Money.format(c.prepaidBalance)}'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Số tiền nạp (VND)',
+                hintText: 'vd 500000',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy')),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(context, int.tryParse(controller.text) ?? 0),
+            child: const Text('Nạp'),
+          ),
+        ],
+      ),
+    );
+    if (amount == null || amount <= 0 || !context.mounted) return;
+    try {
+      final newBalance = await ref
+          .read(customerRepoProvider)
+          .topUp(customerId: c.id, amount: amount);
+      ref.invalidate(customerDetailProvider(c.id));
+      ref.invalidate(customersListProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                'Đã nạp ${Money.format(amount)} · Số dư mới ${Money.format(newBalance)}')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
+      }
+    }
   }
 
   Future<void> _registerPackage(

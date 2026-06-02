@@ -82,4 +82,13 @@ class CustomerRepository {
       'credits_remaining': portionCount,
     });
   }
+
+  /// Nạp thêm tiền trả trước (cộng dồn). Trả về số dư mới.
+  Future<int> topUp({required String customerId, required int amount}) async {
+    final newBalance = await supabase.rpc('topup_balance', params: {
+      'p_customer_id': customerId,
+      'p_amount': amount,
+    });
+    return (newBalance as num).toInt();
+  }
 }

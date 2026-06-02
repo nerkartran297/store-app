@@ -16,7 +16,7 @@ class ReportRepository {
     final rows = await supabase
         .from('invoices')
         .select(
-            'id,total,is_package_invoice,invoice_items(name_snapshot,qty,line_total,from_package,products(cost_price))')
+            'id,total,created_at,is_package_invoice,invoice_items(name_snapshot,qty,line_total,from_package,cost_price_snapshot)')
         .eq('payment_status', 'paid')
         .gte('created_at', fromDay.toIso8601String())
         .lt('created_at', toExclusive.toIso8601String());
@@ -26,12 +26,26 @@ class ReportRepository {
     var orderCount = 0;
     var packageCount = 0;
     final byProduct = <String, TopProduct>{};
+    // Gom doanh thu theo ngày (key = yyyy-mm-dd local).
+    final byDay = <DateTime, ({int revenue, int orders})>{};
 
     for (final r in (rows as List)) {
       final inv = Map<String, dynamic>.from(r as Map);
       orderCount++;
-      revenue += (inv['total'] as num?)?.toInt() ?? 0;
+      final invTotal = (inv['total'] as num?)?.toInt() ?? 0;
+      revenue += invTotal;
       if (inv['is_package_invoice'] as bool? ?? false) packageCount++;
+
+      // Gom theo ngày local.
+      if (inv['created_at'] != null) {
+        final dt = DateTime.parse(inv['created_at'] as String).toLocal();
+        final day = DateTime(dt.year, dt.month, dt.day);
+        final prevDay = byDay[day];
+        byDay[day] = (
+          revenue: (prevDay?.revenue ?? 0) + invTotal,
+          orders: (prevDay?.orders ?? 0) + 1,
+        );
+      }
 
       final items = (inv['invoice_items'] as List?) ?? const [];
       for (final it in items) {
@@ -39,9 +53,8 @@ class ReportRepository {
         final name = item['name_snapshot'] as String? ?? '—';
         final qty = (item['qty'] as num?)?.toInt() ?? 0;
         final lineTotal = (item['line_total'] as num?)?.toInt() ?? 0;
-        final costPrice = item['products'] == null
-            ? 0
-            : ((item['products'] as Map)['cost_price'] as num?)?.toInt() ?? 0;
+        // Giá vốn snapshot tại lúc bán (chính xác kể cả khi giá nhập đổi sau).
+        final costPrice = (item['cost_price_snapshot'] as num?)?.toInt() ?? 0;
 
         cost += qty * costPrice;
 
@@ -57,12 +70,22 @@ class ReportRepository {
     final top = byProduct.values.toList()
       ..sort((a, b) => b.qty.compareTo(a.qty));
 
+    final daily = byDay.entries
+        .map((e) => DailyRevenue(
+              day: e.key,
+              revenue: e.value.revenue,
+              orderCount: e.value.orders,
+            ))
+        .toList()
+      ..sort((a, b) => b.day.compareTo(a.day)); // mới nhất trước
+
     return SalesReport(
       revenue: revenue,
       cost: cost,
       orderCount: orderCount,
       packageInvoiceCount: packageCount,
       topProducts: top.take(10).toList(),
+      daily: daily,
     );
   }
 }

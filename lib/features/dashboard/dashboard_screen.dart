@@ -21,8 +21,9 @@ class DashboardScreen extends ConsumerWidget {
     _NavItem('Mã giảm giá', Icons.local_offer, '/discounts', Color(0xFF7B1FA2)),
     _NavItem('Nhóm khách', Icons.groups, '/groups', Color(0xFF1565C0)),
     _NavItem('Khách hàng', Icons.people, '/customers', Color(0xFF2E7D32)),
-    _NavItem('Gói phần ăn', Icons.card_membership, '/packages',
-        Color(0xFFEF6C00)),
+    // Gói phần ăn tạm ẩn khỏi menu (route /packages vẫn còn nếu cần bật lại).
+    // _NavItem('Gói phần ăn', Icons.card_membership, '/packages',
+    //     Color(0xFFEF6C00)),
     _NavItem('Lịch sử HĐ', Icons.receipt_long, '/invoices', Color(0xFF455A64)),
     _NavItem('Báo cáo', Icons.bar_chart, '/reports', Color(0xFF00695C)),
   ];

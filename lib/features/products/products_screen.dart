@@ -6,11 +6,18 @@ import '../../data/providers.dart';
 import '../../domain/models/product.dart';
 import '../../shared/widgets/async_list.dart';
 
-class ProductsScreen extends ConsumerWidget {
+class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProductsScreen> createState() => _ProductsScreenState();
+}
+
+class _ProductsScreenState extends ConsumerState<ProductsScreen> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
     final products = ref.watch(productsProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Sản phẩm')),
@@ -19,30 +26,54 @@ class ProductsScreen extends ConsumerWidget {
         icon: const Icon(Icons.add),
         label: const Text('Thêm'),
       ),
-      body: AsyncListView<Product>(
-        value: products,
-        emptyMessage: 'Chưa có sản phẩm',
-        onRefresh: () async => ref.invalidate(productsProvider),
-        itemBuilder: (p) => Card(
-          child: ListTile(
-            title: Text(p.name),
-            subtitle: Text(
-                'Nhập ${Money.format(p.costPrice)} · Bán ${Money.format(p.salePrice)} · Tồn ${p.stockQty}'),
-            trailing: PopupMenuButton<String>(
-              onSelected: (v) {
-                if (v == 'edit') _openForm(context, ref, product: p);
-                if (v == 'delete') _confirmDelete(context, ref, p);
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'edit', child: Text('Sửa')),
-                PopupMenuItem(value: 'delete', child: Text('Xóa')),
-              ],
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: TextField(
+              decoration: const InputDecoration(
+                hintText: 'Tìm theo tên sản phẩm',
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: (v) => setState(() => _query = v),
             ),
-            onTap: () => _openForm(context, ref, product: p),
           ),
-        ),
+          Expanded(
+            child: AsyncListView<Product>(
+              value: products.whenData(_filter),
+              emptyMessage: _query.isEmpty
+                  ? 'Chưa có sản phẩm'
+                  : 'Không tìm thấy sản phẩm',
+              onRefresh: () async => ref.invalidate(productsProvider),
+              itemBuilder: (p) => Card(
+                child: ListTile(
+                  title: Text(p.name),
+                  subtitle: Text(
+                      'Nhập ${Money.format(p.costPrice)} · Bán ${Money.format(p.salePrice)} · Tồn ${p.stockQty}'),
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (v) {
+                      if (v == 'edit') _openForm(context, ref, product: p);
+                      if (v == 'delete') _confirmDelete(context, ref, p);
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'edit', child: Text('Sửa')),
+                      PopupMenuItem(value: 'delete', child: Text('Xóa')),
+                    ],
+                  ),
+                  onTap: () => _openForm(context, ref, product: p),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  List<Product> _filter(List<Product> list) {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return list;
+    return list.where((p) => p.name.toLowerCase().contains(q)).toList();
   }
 
   Future<void> _confirmDelete(

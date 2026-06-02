@@ -11,6 +11,19 @@ class TopProduct {
   });
 }
 
+/// Doanh thu của một ngày cụ thể.
+class DailyRevenue {
+  final DateTime day; // ngày (local, đã chuẩn hóa về 00:00)
+  final int revenue;
+  final int orderCount;
+
+  const DailyRevenue({
+    required this.day,
+    required this.revenue,
+    required this.orderCount,
+  });
+}
+
 /// Kết quả báo cáo doanh thu/lãi cho một khoảng thời gian.
 class SalesReport {
   final int revenue; // tổng total các hóa đơn (đã thanh toán)
@@ -18,6 +31,7 @@ class SalesReport {
   final int orderCount; // số hóa đơn
   final int packageInvoiceCount; // số HĐ theo gói
   final List<TopProduct> topProducts;
+  final List<DailyRevenue> daily; // doanh thu theo từng ngày (mới nhất trước)
 
   const SalesReport({
     this.revenue = 0,
@@ -25,6 +39,7 @@ class SalesReport {
     this.orderCount = 0,
     this.packageInvoiceCount = 0,
     this.topProducts = const [],
+    this.daily = const [],
   });
 
   /// Lãi gộp = doanh thu − giá vốn.

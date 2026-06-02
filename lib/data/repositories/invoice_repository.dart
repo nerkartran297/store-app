@@ -24,6 +24,19 @@ class InvoiceRepository {
         .toList();
   }
 
+  /// Hóa đơn của một khách (mới nhất trước) — dùng cho lịch sử "ăn gì".
+  Future<List<Invoice>> fetchByCustomer(String customerId) async {
+    final rows = await supabase
+        .from('invoices')
+        .select('*, invoice_items(*)')
+        .eq('customer_id', customerId)
+        .order('created_at', ascending: false)
+        .limit(100);
+    return (rows as List)
+        .map((e) => Invoice.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
   Future<Invoice> getById(String id) async {
     final row = await supabase
         .from('invoices')
